@@ -37,7 +37,7 @@ class User(Base):
                                   cascade="all, delete-orphan")
 
     __table_args__ = (
-        CheckConstraint('sex IN (0, 1)', name='check_user_sex'),
+        CheckConstraint('sex IN (0, 1, 2) OR sex IS NULL', name='check_user_sex'),
     )
 
     def __repr__(self):
@@ -70,7 +70,7 @@ class Candidate(Base):
                                   back_populates="candidate",
                                   cascade="all, delete-orphan")
     __table_args__ = (
-        CheckConstraint('sex IN (0,1)', name='check_candidate_sex'),
+        CheckConstraint('sex IN (0, 1, 2) OR sex IS NULL', name='check_candidate_sex'),
         Index('idx_candidates_city', 'city'),
         Index('idx_candidates_sex', 'sex'),
         Index('idx_candidates_has_photo', 'has_photo'),
@@ -118,7 +118,8 @@ class Favorite(Base):
     )
 
     def __repr__(self):
-        return f"<Favorite(user_id={self.user_vk_id}, candidate_id={self.candidate_vk_id})>"
+        return f"<Favorite(user_id={self.user_vk_id}, candidate_id={self.candidate_id})>"
+
 
 
 class SearchHistory(Base):
@@ -128,19 +129,20 @@ class SearchHistory(Base):
     user_vk_id = Column(Integer, ForeignKey('users.vk_id', ondelete='CASCADE'), nullable=False)
     candidate_id = Column(Integer, ForeignKey('candidates.vk_id', ondelete='CASCADE'), nullable=False)
     shown_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    reaction = Column(String(50), nullable=True) # 'licked', 'blocked', NULL
+    reaction = Column(String(50), nullable=True) # 'liked', 'blocked', NULL
 
     # Связи
     user = relationship("User", back_populates="search_history")
     candidate = relationship("Candidate", back_populates="search_history")
 
     __table_args__ = (
-        CheckConstraint("reaction IN ('licked', 'blocked') OR reaction IS NULL",
+        CheckConstraint("reaction IN ('liked', 'blocked') OR reaction IS NULL",
                         name='check_reaction'),
         UniqueConstraint('user_vk_id', 'candidate_id', name='unique_search_history_user_candidate'),
         Index('idx_search_history_user', 'user_vk_id', 'candidate_id'),
         Index('idx_search_history_shown_at', 'shown_at'),
     )
+
 
     def __repr__(self):
         return f"<SerchHistory(user_vk_id={self.user_vk_id}, candidate_id={self.candidate_id}, reaction={self.reaction})>"

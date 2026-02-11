@@ -29,14 +29,19 @@ class VkClient:
             'v': '5.199'
         }
 
-    def search_users(self, city_id: int, age_from: int, age_to: int, sex: enum(VKSex)) -> List[VKUser]:
+    def search_users(self, city_id: int, age_from: int, age_to: int, sex: VKSex, offset: int = 0, count: int = 50) -> List[VKUser]:
         url = 'https://api.vk.com/method/users.search'
         params = {
-            city_id: city_id,
-            age_from: age_from,
-            age_to: age_to,
-            sex: sex
+            "city": city_id,
+            "age_from": age_from,
+            "age_to": age_to,
+            "sex": sex.value,  # Enum -> число
+            "count": count,
+            "offset": offset,
+            "has_photo": 1,
+            "fields": "city,sex,is_closed,can_access_closed"
         }
+
         response = requests.get(url, params={**self._get_comon_params(), **params})
         data = response.json()
         users = []
