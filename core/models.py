@@ -37,7 +37,7 @@ class User(Base):
                                   cascade="all, delete-orphan")
 
     __table_args__ = (
-        CheckConstraint('sex IN (0, 1)', name='check_user_sex'),
+        CheckConstraint('sex IN (0, 1, 2)', name='check_user_sex'),
     )
 
     def __repr__(self):
@@ -70,7 +70,7 @@ class Candidate(Base):
                                   back_populates="candidate",
                                   cascade="all, delete-orphan")
     __table_args__ = (
-        CheckConstraint('sex IN (0,1)', name='check_candidate_sex'),
+        CheckConstraint('sex IN (0, 1, 2)', name='check_candidate_sex'),
         Index('idx_candidates_city', 'city'),
         Index('idx_candidates_sex', 'sex'),
         Index('idx_candidates_has_photo', 'has_photo'),
@@ -118,7 +118,7 @@ class Favorite(Base):
     )
 
     def __repr__(self):
-        return f"<Favorite(user_id={self.user_vk_id}, candidate_id={self.candidate_vk_id})>"
+        return f"<Favorite(user_id={self.user_vk_id}, candidate_id={self.candidate_id})>"
 
 
 class SearchHistory(Base):
@@ -143,7 +143,7 @@ class SearchHistory(Base):
     )
 
     def __repr__(self):
-        return f"<SerchHistory(user_vk_id={self.user_vk_id}, candidate_id={self.candidate_id}, reaction={self.reaction})>"
+        return f"<SearchHistory(user_vk_id={self.user_vk_id}, candidate_id={self.candidate_id}, reaction={self.reaction})>"
 
 
 class DatabaseManager:

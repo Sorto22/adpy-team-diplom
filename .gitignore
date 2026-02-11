@@ -14,3 +14,5 @@ venv/
 *.db
 *.log
 задание
+test*
+tests/
