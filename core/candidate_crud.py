@@ -27,7 +27,7 @@ class CandidateCRUD:
             'bdate': bdate,
             'city': city,
             'sex': sex,
-            'has_photo': True
+            'has_photo': has_photo
         }
         return self.candidate_repository.create_or_update(vk_id, **user_data)
 
@@ -36,7 +36,7 @@ class CandidateCRUD:
                             age_to: int = 99, limit: int = 10) -> List[Candidate]:
         viewed_ids = self.histories_repository.get_viewed_candidates(user_vk_id)
         blacklisted_ids = self.blacklist_repository.get_blocked_candidates(user_vk_id)
-        favorite_ids = self.favorite_repository.get_favorite_candidates(user_vk_id)
+        favorite_ids = self.favorite_repository.get_favorite_candidate_ids(user_vk_id)
 
         excluded_ids = list(set(viewed_ids + blacklisted_ids + favorite_ids))
 

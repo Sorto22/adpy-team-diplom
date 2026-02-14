@@ -28,7 +28,7 @@ class UserCRUD:
         return self.user_repository.create_or_update(vk_id, **user_data)
 
     def get_user(self, vk_id: int) -> Optional[User]:
-        return self.user_repository.get_by_id(vk_id)
+        return self.user_repository.get_by_vk_id(vk_id)
 
     def get_user_favorites(self, vk_id: int) -> List[Candidate]:
         return self.user_repository.get_user_favorites(vk_id)
