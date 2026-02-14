@@ -14,5 +14,6 @@ venv/
 *.db
 *.log
 задание
+token_vk.py
 test*
 tests/
