@@ -200,3 +200,4 @@ class VkClient:
             return {}
 
         return data
+
