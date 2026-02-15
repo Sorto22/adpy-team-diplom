@@ -3,6 +3,7 @@ from typing import List
 from enum import Enum
 import requests
 import time
+import datetime
 
 
 @dataclass
@@ -20,6 +21,9 @@ class VKUser:
     first_name: str
     last_name: str
     profile_url: str
+    bdate: datetime.date
+    city: str
+    sex: int
 
 
 class VKSex(Enum):
@@ -70,51 +74,54 @@ class VkClient:
         }
 
     def search_users(self, city_id: int, age_from: int, age_to: int, sex: int) -> List[VKUser]:
-    """
-    Ищет пользователей ВКонтакте по заданным критериям.
+        """
+        Ищет пользователей ВКонтакте по заданным критериям.
 
-    Args:
-        city_id (int): ID города для поиска.
-        age_from (int): Нижняя граница возраста.
-        age_to (int): Верхняя граница возраста.
-        sex (int): Пол пользователя (1 — женщины, 2 — мужчины, 0 — любые).
+        Args:
+            city_id (int): ID города для поиска.
+            age_from (int): Нижняя граница возраста.
+            age_to (int): Верхняя граница возраста.
+            sex (int): Пол пользователя (1 — женщины, 2 — мужчины, 0 — любые).
 
-    Returns:
-        List[VKUser]: Список найденных пользователей, у которых профиль открыт и есть фото.
-        Возвращает пустой список при ошибках или отсутствии результатов.
+        Returns:
+            List[VKUser]: Список найденных пользователей, у которых профиль открыт и есть фото.
+            Возвращает пустой список при ошибках или отсутствии результатов.
 
-    Example:
-        >>> vk_client = VkClient(token)
-        >>> users = vk_client.search_users(city_id=2, age_from=25, age_to=30, sex=VKSex.MEN)
-        >>> for user in users:
-        ...     print(user.first_name, user.last_name, user.profile_url)
-    """
-    params = {
-        "city_id": city_id,
-        "age_from": age_from,
-        "age_to": age_to,
-        "sex": sex.value if isinstance(sex, VKSex) else sex,
-        "fields": "is_closed, has_photo"
-    }
-    data = self._request("users.search", params)
+        Example:
+            >>> vk_client = VkClient(token)
+            >>> users = vk_client.search_users(city_id=2, age_from=25, age_to=30, sex=VKSex.MEN)
+            >>> for user in users:
+            ...     print(user.first_name, user.last_name, user.profile_url)
+        """
+        params = {
+            "city_id": city_id,
+            "age_from": age_from,
+            "age_to": age_to,
+            "sex": sex.value if isinstance(sex, VKSex) else sex,
+            "fields": "is_closed, has_photo, bdate, sex, city"
+        }
+        data = self._request("users.search", params)
 
-    if not data or 'response' not in data:
-        print("Не удалось получить пользователей")
-        return []
+        if not data or 'response' not in data:
+            print("Не удалось получить пользователей")
+            return []
 
-    users = []
-    for item in data['response']['items']:
-        if item['is_closed']:
-            continue
-        if not item['has_photo']:
-            continue
-        user_id = item['id']
-        first_name = item['first_name']
-        last_name = item['last_name']
-        profile_url = f"https://vk.com/id{user_id}"
-        users.append(VKUser(id=user_id, first_name=first_name, last_name=last_name,
-                            profile_url=profile_url))
-    return users
+        users = []
+        for item in data['response']['items']:
+            if item['is_closed']:
+                continue
+            if not item['has_photo']:
+                continue
+            user_id = item['id']
+            first_name = item['first_name']
+            last_name = item['last_name']
+            profile_url = f"https://vk.com/id{user_id}"
+            bdate = item['bdate']
+            city = item['city']['title']
+            sex = item['sex']
+            users.append(VKUser(id=user_id, first_name=first_name, last_name=last_name,
+                                profile_url=profile_url, bdate=bdate, city=city, sex=sex))
+        return users
 
     def get_user_photos(self, user_id: int) -> List[str]:
         """
