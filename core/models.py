@@ -15,7 +15,7 @@ class User(Base):
     '''Модель пользователя'''
     __tablename__ = 'users'
 
-    vk_id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, primary_key=True)
     first_name = Column(String(50), nullable=False)
     last_name = Column(String(50), nullable=False)
     bdate = Column(Date, nullable=True)
@@ -37,17 +37,17 @@ class User(Base):
                                   cascade="all, delete-orphan")
 
     __table_args__ = (
-        CheckConstraint('sex IN (0, 1)', name='check_user_sex'),
+        CheckConstraint('sex IN (0, 1, 2)', name='check_user_sex'),
     )
 
     def __repr__(self):
-        return f"<User(user_id={self.vk_id}, first_name={self.first_name}, last_name={self.last_name})>"
+        return f"<User(user_id={self.user_id}, first_name={self.first_name}, last_name={self.last_name})>"
 
 
 class Candidate(Base):
     '''Модель кандидата для знакомства'''
     __tablename__ = 'candidates'
-    vk_id = Column(Integer, primary_key=True)
+    candidate_id = Column(Integer, primary_key=True)
     first_name = Column(String(50), nullable=False)
     last_name = Column(String(50), nullable=False)
     bdate = Column(Date, nullable=True)
@@ -70,22 +70,22 @@ class Candidate(Base):
                                   back_populates="candidate",
                                   cascade="all, delete-orphan")
     __table_args__ = (
-        CheckConstraint('sex IN (0,1)', name='check_candidate_sex'),
+        CheckConstraint('sex IN (0, 1, 2)', name='check_candidate_sex'),
         Index('idx_candidates_city', 'city'),
         Index('idx_candidates_sex', 'sex'),
         Index('idx_candidates_has_photo', 'has_photo'),
     )
 
     def __repr__(self):
-        return f"<Candidate(vk_id={self.vk_id}, first_name={self.first_name}, last_name={self.last_name})>"
+        return f"<Candidate(candidate_id={self.candidate_id}, first_name={self.first_name}, last_name={self.last_name})>"
 
 
 class Blacklist(Base):
     '''Модель списка блокировки'''
     __tablename__ = 'blacklist'
     id = Column(Integer, primary_key=True)
-    user_vk_id = Column(Integer, ForeignKey('users.vk_id', ondelete='CASCADE'), nullable=False)
-    candidate_id = Column(Integer, ForeignKey('candidates.vk_id', ondelete='CASCADE'), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    candidate_id = Column(Integer, ForeignKey('candidates.candidate_id', ondelete='CASCADE'), nullable=False)
     blocked_at = Column(DateTime(timezone=True), server_default=func.now())
 
     #Связи
@@ -93,40 +93,40 @@ class Blacklist(Base):
     candidate = relationship("Candidate", back_populates="blacklisted")
 
     __table_args__ = (
-        UniqueConstraint('user_vk_id', 'candidate_id', name='unique_blacklist_user_candidate'),
-        Index('idx_blacklist_user', 'user_vk_id'),
+        UniqueConstraint('user_id', 'candidate_id', name='unique_blacklist_user_candidate'),
+        Index('idx_blacklist_user', 'user_id'),
     )
 
     def __repr__(self):
-        return f"<Blacklist(vk_id={self.user_vk_id}, candidate_id={self.candidate_id})>"
+        return f"<Blacklist(user_id={self.user_id}, candidate_id={self.candidate_id})>"
 
 
 class Favorite(Base):
     '''Модель избранного'''
     __tablename__ = 'favorites'
     id = Column(Integer, primary_key=True)
-    user_vk_id = Column(Integer, ForeignKey('users.vk_id', ondelete='CASCADE'), nullable=False)
-    candidate_id = Column(Integer, ForeignKey('candidates.vk_id', ondelete='CASCADE'), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    candidate_id = Column(Integer, ForeignKey('candidates.candidate_id', ondelete='CASCADE'), nullable=False)
     added_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user = relationship("User", back_populates="favorites")
     candidate = relationship("Candidate", back_populates="favorites")
 
     __table_args__ = (
-        UniqueConstraint('user_vk_id', 'candidate_id', name='unique_favorite_user_candidate'),
-        Index('idx_favorite_user', 'user_vk_id'),
+        UniqueConstraint('user_id', 'candidate_id', name='unique_favorite_user_candidate'),
+        Index('idx_favorite_user', 'user_id'),
     )
 
     def __repr__(self):
-        return f"<Favorite(user_id={self.user_vk_id}, candidate_id={self.candidate_vk_id})>"
+        return f"<Favorite(user_id={self.user_id}, candidate_id={self.candidate_id})>"
 
 
 class SearchHistory(Base):
     '''Модель истории просмотров'''
     __tablename__ = 'search_history'
     id = Column(Integer, primary_key=True)
-    user_vk_id = Column(Integer, ForeignKey('users.vk_id', ondelete='CASCADE'), nullable=False)
-    candidate_id = Column(Integer, ForeignKey('candidates.vk_id', ondelete='CASCADE'), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
+    candidate_id = Column(Integer, ForeignKey('candidates.candidate_id', ondelete='CASCADE'), nullable=False)
     shown_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     reaction = Column(String(50), nullable=True) # 'licked', 'blocked', NULL
 
@@ -137,13 +137,13 @@ class SearchHistory(Base):
     __table_args__ = (
         CheckConstraint("reaction IN ('licked', 'blocked') OR reaction IS NULL",
                         name='check_reaction'),
-        UniqueConstraint('user_vk_id', 'candidate_id', name='unique_search_history_user_candidate'),
-        Index('idx_search_history_user', 'user_vk_id', 'candidate_id'),
+        UniqueConstraint('user_id', 'candidate_id', name='unique_search_history_user_candidate'),
+        Index('idx_search_history_user', 'user_id', 'candidate_id'),
         Index('idx_search_history_shown_at', 'shown_at'),
     )
 
     def __repr__(self):
-        return f"<SerchHistory(user_vk_id={self.user_vk_id}, candidate_id={self.candidate_id}, reaction={self.reaction})>"
+        return f"<SearchHistory(user_id={self.user_id}, candidate_id={self.candidate_id}, reaction={self.reaction})>"
 
 
 class DatabaseManager:

@@ -15,4 +15,5 @@ venv/
 *.log
 задание
 token_vk.py
-testapi.py
+test*
+tests/
