@@ -112,13 +112,13 @@ class VkClient:
                 continue
             if not item['has_photo']:
                 continue
-            user_id = item['id']
-            first_name = item['first_name']
-            last_name = item['last_name']
+            user_id = item.get('id', None)
+            first_name = item.get('first_name', "Неизвестно")
+            last_name = item.get('last_name', "")
             profile_url = f"https://vk.com/id{user_id}"
-            bdate = item['bdate']
-            city = item['city']['title']
-            sex = item['sex']
+            bdate = item.get('bdate', None)
+            city = item.get('city', {}).get('title')
+            sex = item.get('sex')
             users.append(VKUser(id=user_id, first_name=first_name, last_name=last_name,
                                 profile_url=profile_url, bdate=bdate, city=city, sex=sex))
         return users
@@ -155,11 +155,11 @@ class VkClient:
             return []
 
         photos_all = [
-            {"likes": photo['likes']['count'],
-             "id_photo": photo["id"],
-             "owner_id": photo['owner_id'],
+            {"likes": photo.get('likes', {}).get('count', 0),
+             "id_photo": photo.get("id", None),
+             "owner_id": photo.get("owner_id", None),
              }
-            for photo in photos['response']['items']
+            for photo in photos.get('response', []).get('items', [])
         ]
 
         photos_all.sort(key=lambda photo: photo['likes'], reverse=True)
@@ -201,3 +201,25 @@ class VkClient:
 
         return data
 
+    def get_user_profile(self, user_id):
+        params = {
+            "user_ids":user_id,
+            "fields":"is_closed, has_photo, bdate, sex, city"
+        }
+        user = self._request("users.get", params)
+        user_data = user.get('response', [{}])[0]
+        first_name = user_data.get('first_name', None)
+        last_name = user_data.get('last_name', '')
+        profile_url = f"https://vk.com/id{user_id}"
+        bdate = user_data.get('bdate', None)
+        city = user_data.get('city', {}).get('title', None)
+        sex = user_data.get('sex')
+        return VKUser(
+            id=user_id,
+            first_name=first_name,
+            last_name=last_name,
+            profile_url=profile_url,
+            bdate=bdate,
+            city=city,
+            sex=sex
+        )
