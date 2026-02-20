@@ -24,6 +24,7 @@ class VKUser:
     bdate: datetime.date
     city: str
     sex: int
+    city_id: int
 
 
 class VKSex(Enum):
@@ -119,8 +120,9 @@ class VkClient:
             bdate = item.get('bdate', None)
             city = item.get('city', {}).get('title')
             sex = item.get('sex')
+            city_id=item.get('city', {}).get('id', 1)
             users.append(VKUser(id=user_id, first_name=first_name, last_name=last_name,
-                                profile_url=profile_url, bdate=bdate, city=city, sex=sex))
+                                profile_url=profile_url, bdate=bdate, city=city, sex=sex, city_id=city_id))
         return users
 
     def get_user_photos(self, user_id: int) -> List[str]:
@@ -214,6 +216,7 @@ class VkClient:
         bdate = user_data.get('bdate', None)
         city = user_data.get('city', {}).get('title', None)
         sex = user_data.get('sex')
+        city_id = user_data.get('city', {}).get('id', 1)
         return VKUser(
             id=user_id,
             first_name=first_name,
@@ -221,5 +224,6 @@ class VkClient:
             profile_url=profile_url,
             bdate=bdate,
             city=city,
-            sex=sex
+            sex=sex,
+            city_id=city_id
         )
