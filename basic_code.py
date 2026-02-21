@@ -6,7 +6,7 @@ import vk_api
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.keyboard import VkKeyboard, VkKeyboardColor
 
-from config import Config
+from config import config
 from core.init_db_for_vk_dating_bot import create_database
 from core.models import DatabaseManager
 from core.base_repository import (
@@ -18,16 +18,18 @@ from core.base_repository import (
 )
 from vkapi import VkClient, VKSex
 
-COUNTRY_RU = 1
+DEFAULT_CITY_ID = 1  # Москва
+AGE_DELTA = 5        # ищем ±5 лет от возраста пользователя
 
 
 @dataclass
 class DialogState:
-    city_id: Optional[int] = None
+    city_id: int = DEFAULT_CITY_ID
     city_title: Optional[str] = None
     age: Optional[int] = None
+    target_sex: VKSex = VKSex.ALL
     last_candidate_id: Optional[int] = None
-    awaiting: Optional[str] = None  # "city_id" | "age"
+    awaiting: Optional[str] = None  # "sex" | "age"
 
 
 def build_keyboard() -> str:
@@ -37,6 +39,17 @@ def build_keyboard() -> str:
     kb.add_line()
     kb.add_button("⛔️ В ЧС", color=VkKeyboardColor.NEGATIVE)
     kb.add_button("⭐️ Избранное", color=VkKeyboardColor.SECONDARY)
+    kb.add_line()
+    kb.add_button("🔄 Сменить настройки", color=VkKeyboardColor.SECONDARY)
+    return kb.get_keyboard()
+
+
+def build_sex_keyboard() -> str:
+    kb = VkKeyboard(one_time=True, inline=False)
+    kb.add_button("👩 Женщину", color=VkKeyboardColor.POSITIVE)
+    kb.add_button("👨 Мужчину", color=VkKeyboardColor.PRIMARY)
+    kb.add_line()
+    kb.add_button("👥 Неважно", color=VkKeyboardColor.SECONDARY)
     return kb.get_keyboard()
 
 
@@ -46,18 +59,18 @@ def profile_url(vk_id: int) -> str:
 
 class VkinderBot:
     def __init__(self):
-        self.cfg = Config()
-        self.cfg.validate()
+        config.validate()
 
-        self.vk_session = vk_api.VkApi(token=self.cfg.BOT_TOKEN)
+        self.vk_session = vk_api.VkApi(token=config.BOT_TOKEN)
         self.vk = self.vk_session.get_api()
         self.longpoll = VkLongPoll(self.vk_session)
 
-        self.vk_user = VkClient(self.cfg.VK_TOKEN)
+        self.vk_user = VkClient(config.VK_TOKEN)
 
-        self.db = DatabaseManager(self.cfg.POSTGRES_URI)
+        self.db = DatabaseManager(config.POSTGRES_URI)
 
-        self.kb = build_keyboard()
+        self.kb_main = build_keyboard()
+        self.kb_sex = build_sex_keyboard()
         self.state: Dict[int, DialogState] = {}
 
     def st(self, user_id: int) -> DialogState:
@@ -65,12 +78,18 @@ class VkinderBot:
             self.state[user_id] = DialogState()
         return self.state[user_id]
 
-    def write_msg(self, user_id: int, message: str, attachments: Optional[List[str]] = None):
+    def write_msg(
+        self,
+        user_id: int,
+        message: str,
+        attachments: Optional[List[str]] = None,
+        keyboard: Optional[str] = None,
+    ):
         params = {
             "user_id": user_id,
             "message": message,
             "random_id": randrange(10**7),
-            "keyboard": self.kb,
+            "keyboard": keyboard or self.kb_main,
         }
         if attachments:
             params["attachment"] = ",".join(attachments)
@@ -83,7 +102,7 @@ class VkinderBot:
             session.rollback()
             raise
 
-    # ---------- DB operations ----------
+    # ---------- DB ----------
     def upsert_user(self, user_id: int, first_name: str, last_name: str):
         s = self.db.get_session()
         try:
@@ -147,7 +166,6 @@ class VkinderBot:
         s = self.db.get_session()
         try:
             FavoriteRepository(s).add_to_favorites(user_id, cand_id)
-            # constraint в models.py: 'licked' | 'blocked' | NULL
             SearchHistoryRepository(s).set_reaction(user_id, cand_id, "licked")
             self._commit(s)
         finally:
@@ -170,7 +188,23 @@ class VkinderBot:
         finally:
             s.close()
 
-    # ---------- Dialog logic ----------
+    # ---------- Settings flow ----------
+    def start_settings_flow(self, user_id: int, prefix_text: Optional[str] = None):
+        st = self.st(user_id)
+        st.awaiting = "sex"
+        msg = "Кого ищем?"
+        if prefix_text:
+            msg = prefix_text.strip() + "\n\n" + msg
+        self.write_msg(user_id, msg, keyboard=self.kb_sex)
+
+    def reset_settings(self, user_id: int):
+        st = self.st(user_id)
+        st.age = None
+        st.target_sex = VKSex.ALL
+        st.last_candidate_id = None
+        st.awaiting = None
+
+    # ---------- Dialog ----------
     def handle_start(self, user_id: int):
         st = self.st(user_id)
         st.last_candidate_id = None
@@ -183,29 +217,40 @@ class VkinderBot:
 
         self.upsert_user(user_id, me.first_name or "", me.last_name or "")
 
-        hint = f" (у тебя в профиле указан: {me.city})" if getattr(me, "city", None) else ""
-        st.awaiting = "city_id"
-        self.write_msg(
-            user_id,
-            "Напиши ID города ВК числом (например: 1 для Москвы)."
-            + hint
-            + "\nПодсказка: найти ID можно через поиск 'VK database.getCities' или в интернете по запросу 'id города vk <город>'."
-        )
+        st.city_id = getattr(me, "city_id", None) or DEFAULT_CITY_ID
+        st.city_title = getattr(me, "city", None) or ("Москва" if st.city_id == 1 else None)
 
-    def handle_city_id(self, user_id: int, text: str):
+        city_line = f"Город поиска: {st.city_title or 'не указан'} (id={st.city_id})"
+        self.start_settings_flow(user_id, prefix_text=f"Старт ✅\n{city_line}")
+
+    def handle_change_settings(self, user_id: int):
+        self.reset_settings(user_id)
+        self.start_settings_flow(user_id, prefix_text="Ок, давай поменяем настройки 🔄")
+
+    def handle_sex(self, user_id: int, text: str):
         st = self.st(user_id)
-        try:
-            city_id = int(text.strip())
-            if city_id <= 0:
-                raise ValueError
-        except ValueError:
-            self.write_msg(user_id, "Нужно число — ID города (например: 1). Попробуй ещё раз.")
+        low = text.strip().lower()
+
+        if "жен" in low:
+            st.target_sex = VKSex.WOMEN
+            who = "женщин"
+        elif "муж" in low:
+            st.target_sex = VKSex.MEN
+            who = "мужчин"
+        elif "неваж" in low:
+            st.target_sex = VKSex.ALL
+            who = "всех"
+        else:
+            self.write_msg(user_id, "Выбери вариант кнопкой 👇", keyboard=self.kb_sex)
             return
 
-        st.city_id = city_id
-        st.city_title = f"id={city_id}"
         st.awaiting = "age"
-        self.write_msg(user_id, "Ок. Теперь напиши возраст числом (например: 25).")
+        self.write_msg(
+            user_id,
+            f"Ок, ищем: {who}.\n\n"
+            f"Теперь напиши свой возраст числом (18–99).\n"
+            f"Поиск будет по возрасту: (твой возраст − {AGE_DELTA}) … (твой возраст + {AGE_DELTA}).",
+        )
 
     def handle_age(self, user_id: int, text: str):
         st = self.st(user_id)
@@ -216,33 +261,32 @@ class VkinderBot:
         except ValueError:
             self.write_msg(user_id, "Возраст должен быть числом 18–99. Например: 25")
             return
+
         st.age = age
+        age_from = max(18, age - AGE_DELTA)
+        age_to = min(99, age + AGE_DELTA)
+
         st.awaiting = None
-        self.write_msg(user_id, "Ок. Жми «Дальше» 👇")
+        self.write_msg(
+            user_id,
+            f"Принято ✅\n"
+            f"Буду искать кандидатов {age_from}–{age_to} лет.\n"
+            f"Жми «Дальше» 👇",
+        )
 
     def pick_next_candidate(self, user_id: int) -> Optional[Tuple[int, str, List[str]]]:
         st = self.st(user_id)
-        if st.city_id is None or st.age is None:
+        if st.age is None:
             return None
 
-        me = self.vk_user.get_user_profile(user_id)
-        user_sex = int(getattr(me, "sex", 0) or 0)
-
-        if user_sex == 1:
-            search_sex = VKSex.MEN
-        elif user_sex == 2:
-            search_sex = VKSex.WOMEN
-        else:
-            search_sex = VKSex.ALL
-
-        age_from = max(18, st.age - 5)
-        age_to = min(99, st.age + 5)
+        age_from = max(18, st.age - AGE_DELTA)
+        age_to = min(99, st.age + AGE_DELTA)
 
         users = self.vk_user.search_users(
             city_id=st.city_id,
             age_from=age_from,
             age_to=age_to,
-            sex=search_sex,
+            sex=st.target_sex,
         )
 
         for cand in users:
@@ -263,7 +307,6 @@ class VkinderBot:
             self.mark_shown(user_id, cid)
 
             photos = self.vk_user.get_user_photos(cid)
-
             text = f"{cand.first_name} {cand.last_name}\n{cand.profile_url}"
             return cid, text, photos
 
@@ -305,12 +348,9 @@ class VkinderBot:
             lines.append(profile_url(cid))
         self.write_msg(user_id, "\n".join(lines))
 
-    # ---------- Main loop ----------
     def run(self):
         for event in self.longpoll.listen():
-            if event.type != VkEventType.MESSAGE_NEW:
-                continue
-            if not event.to_me:
+            if event.type != VkEventType.MESSAGE_NEW or not event.to_me:
                 continue
 
             user_id = event.user_id
@@ -319,8 +359,8 @@ class VkinderBot:
 
             st = self.st(user_id)
 
-            if st.awaiting == "city_id":
-                self.handle_city_id(user_id, text)
+            if st.awaiting == "sex":
+                self.handle_sex(user_id, text)
                 continue
             if st.awaiting == "age":
                 self.handle_age(user_id, text)
@@ -328,6 +368,8 @@ class VkinderBot:
 
             if low in ("/start", "start", "начать", "привет"):
                 self.handle_start(user_id)
+            elif low in ("🔄 сменить настройки", "сменить настройки", "настройки"):
+                self.handle_change_settings(user_id)
             elif low in ("дальше", "next"):
                 self.handle_next(user_id)
             elif low in ("❤️ в избранное", "в избранное"):
@@ -339,16 +381,14 @@ class VkinderBot:
             else:
                 self.write_msg(
                     user_id,
-                    "Команды: /start, Дальше, ❤️ В избранное, ⛔️ В ЧС, ⭐️ Избранное",
+                    "Команды: /start, Дальше, ❤️ В избранное, ⛔️ В ЧС, ⭐️ Избранное, 🔄 Сменить настройки",
                 )
 
 
 if __name__ == "__main__":
-    cfg = Config()
-    cfg.validate()
-
+    config.validate()
     create_database()
-    DatabaseManager(cfg.POSTGRES_URI).create_tables()
+    DatabaseManager(config.POSTGRES_URI).create_tables()
 
     bot = VkinderBot()
     bot.run()
