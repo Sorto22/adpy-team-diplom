@@ -10,6 +10,7 @@ import datetime
 class VKUser:
     """
     Dataclass, представляющая пользователя VK.
+
     Attributes:
         id (int): Уникальный идентификатор пользователя в VK.
         first_name (str): Имя пользователя.
@@ -28,6 +29,7 @@ class VKUser:
 class VKSex(Enum):
     """
     Перечисление для указания пола при поиске пользователей.
+
     Значения соответствуют API VK:
         WOMEN = 1 — искать женщин.
         MEN = 2 — искать мужчин.
@@ -41,8 +43,10 @@ class VKSex(Enum):
 class VkClient:
     """
     Клиент для взаимодействия с API ВКонтакте.
+
     Предоставляет методы для поиска пользователей и получения фотографий.
     Автоматически добавляет токен доступа и версию API ко всем запросам.
+
     Attributes:
         token (str): Токен доступа к API VK.
         api_url (str): Базовый URL для вызова методов API.
@@ -50,6 +54,7 @@ class VkClient:
     def __init__(self, token: str):
         """
         Инициализирует клиент с токеном доступа.
+
         Args:
             token (str): Токен доступа к API VK.
         """
@@ -59,6 +64,7 @@ class VkClient:
     def _get_common_params(self) -> dict:
         """
         Возвращает общие параметры, добавляемые ко всем запросам.
+
         Returns:
             dict: Словарь с параметрами 'access_token' и 'v' (версия API).
         """
@@ -70,14 +76,17 @@ class VkClient:
     def search_users(self, city_id: int, age_from: int, age_to: int, sex: int) -> List[VKUser]:
         """
         Ищет пользователей ВКонтакте по заданным критериям.
+
         Args:
             city_id (int): ID города для поиска.
             age_from (int): Нижняя граница возраста.
             age_to (int): Верхняя граница возраста.
             sex (int): Пол пользователя (1 — женщины, 2 — мужчины, 0 — любые).
+
         Returns:
             List[VKUser]: Список найденных пользователей, у которых профиль открыт и есть фото.
             Возвращает пустой список при ошибках или отсутствии результатов.
+
         Example:
             >>> vk_client = VkClient(token)
             >>> users = vk_client.search_users(city_id=2, age_from=25, age_to=30, sex=VKSex.MEN)
@@ -110,19 +119,24 @@ class VkClient:
             bdate = item.get('bdate', None)
             city = item.get('city', {}).get('title')
             sex = item.get('sex')
+            city_id=item.get('city', {}).get('id', 1)
             users.append(VKUser(id=user_id, first_name=first_name, last_name=last_name,
-                                profile_url=profile_url, bdate=bdate, city=city, sex=sex))
+                                profile_url=profile_url, bdate=bdate, city=city, sex=sex, city_id=city_id))
         return users
 
     def get_user_photos(self, user_id: int) -> List[str]:
         """
         Получает ID трёх самых популярных фотографий профиля пользователя.
+
         Выполняет паузу 0.2 секунды перед запросом для соблюдения лимитов API.
+
         Args:
             user_id (int): Уникальный идентификатор пользователя ВКонтакте.
+
         Returns:
             List[str]: Список строк в формате "photo<owner_id>_<photo_id>", пригодных
             для отправки через Bot API. Возвращает пустой список при ошибках.
+
         Example:
             >>> photos = vk_client.get_user_photos(12345)
             >>> print(photos)
@@ -157,10 +171,13 @@ class VkClient:
     def _request(self, method_name: str, params: dict) -> dict:
         """
         Выполняет HTTP-запрос к VK API.
+
         Добавляет общие параметры (токен и версию API) и обрабатывает ошибки.
+
         Args:
             method_name (str): Название метода API (например, "users.search").
             params (dict): Параметры запроса.
+
         Returns:
             dict: Ответ API в формате JSON. При ошибках сети, парсинга или в случае ошибки
             от сервера ВКонтакте возвращается пустой словарь.
@@ -198,6 +215,8 @@ class VkClient:
         bdate = user_data.get('bdate', None)
         city = user_data.get('city', {}).get('title', None)
         sex = user_data.get('sex')
+        city_id = user_data.get('city', {}).get('id', 1)
+
         return VKUser(
             id=user_id,
             first_name=first_name,
@@ -205,5 +224,6 @@ class VkClient:
             profile_url=profile_url,
             bdate=bdate,
             city=city,
-            sex=sex
+            sex=sex,
+            city_id=city_id
         )
