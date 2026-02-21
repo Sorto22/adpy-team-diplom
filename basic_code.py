@@ -220,7 +220,7 @@ class VkinderBot:
         st.city_id = getattr(me, "city_id", None) or DEFAULT_CITY_ID
         st.city_title = getattr(me, "city", None) or ("Москва" if st.city_id == 1 else None)
 
-        city_line = f"Город поиска: {st.city_title or 'не указан'} (id={st.city_id})"
+        city_line = f"Город поиска: {st.city_title or 'не указан'} "
         self.start_settings_flow(user_id, prefix_text=f"Старт ✅\n{city_line}")
 
     def handle_change_settings(self, user_id: int):
