@@ -12,7 +12,10 @@ Base = declarative_base()
 
 
 class User(Base):
-    '''Модель пользователя'''
+    """Модель пользователя.
+
+    Хранит основные данные о пользователе бота, включая профиль и настройки.
+    """
     __tablename__ = 'users'
 
     user_id = Column(Integer, primary_key=True)
@@ -45,7 +48,10 @@ class User(Base):
 
 
 class Candidate(Base):
-    '''Модель кандидата для знакомства'''
+    """Модель кандидата для знакомства.
+
+    Хранит данные о пользователях, найденных для показа.
+    """
     __tablename__ = 'candidates'
     candidate_id = Column(Integer, primary_key=True)
     first_name = Column(String(50), nullable=False)
@@ -81,7 +87,10 @@ class Candidate(Base):
 
 
 class Blacklist(Base):
-    '''Модель списка блокировки'''
+    """Модель списка блокировки.
+
+    Связывает пользователя и кандидата, которого он добавил в чёрный список.
+    """
     __tablename__ = 'blacklist'
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
@@ -102,7 +111,10 @@ class Blacklist(Base):
 
 
 class Favorite(Base):
-    '''Модель избранного'''
+    """Модель избранного.
+
+    Связывает пользователя и кандидата, которого он добавил в избранное.
+    """
     __tablename__ = 'favorites'
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
@@ -122,7 +134,10 @@ class Favorite(Base):
 
 
 class SearchHistory(Base):
-    '''Модель истории просмотров'''
+    """Модель истории просмотров.
+
+    Фиксирует, какие кандидаты были показаны пользователю и какую реакцию он оставил.
+    """
     __tablename__ = 'search_history'
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.user_id', ondelete='CASCADE'), nullable=False)
@@ -147,25 +162,46 @@ class SearchHistory(Base):
 
 
 class DatabaseManager:
-    def __init__(self, database_url: Optional[str] = None):
-        if database_url is None:
+    """Менеджер подключения и сессий к базе данных.
 
+    Использует SQLAlchemy для управления соединением и сессиями.
+    """
+    def __init__(self, database_url: Optional[str] = None):
+        """Инициализирует менеджер базы данных.
+
+        Если URL не передан, использует значение из конфигурации.
+
+        Args:
+            database_url: Строка подключения к PostgreSQL.
+        """
+        if database_url is None:
             database_url = Config.POSTGRES_URI
 
         self.engine = create_engine(database_url, echo=False)
         self.Session = sessionmaker(bind=self.engine)
 
-    def create_tables(self):
-        '''Создание всех таблиц в базе данных'''
-        Base.metadata.create_all(self.engine)
-        print('Таблицы солзаны успешно')
+    def create_tables(self) -> None:
+        """Создаёт все таблицы в базе данных, если они ещё не существуют.
 
-    def drop_tables(self):
-        '''Удаление всех таблиц'''
+        Вызывает Base.metadata.create_all для создания всех моделей.
+        """
+        Base.metadata.create_all(self.engine)
+        print('Таблицы созданы успешно')
+
+    def drop_tables(self) -> None:
+        """Удаляет все таблицы из базы данных.
+
+        Полностью очищает схему, удаляя все таблицы, связанные с моделями.
+        """
         Base.metadata.drop_all(self.engine)
         print('Все таблицы удалены')
 
-    def get_session(self):
+    def get_session(self) -> Session:
+        """Возвращает новую сессию SQLAlchemy для работы с базой данных.
+
+        Returns:
+            Объект сессии, готовый к использованию.
+        """
         return self.Session()
 
 

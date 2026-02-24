@@ -8,7 +8,16 @@ from .base_repository import (CandidateRepository, SearchHistoryRepository,
 
 
 class CandidateCRUD:
-    def __init__(self, session:Session):
+    """Класс для бизнес-логики, связанной с кандидатами.
+
+    Предоставляет методы для поиска, сохранения и управления кандидатами.
+    """
+    def __init__(self, session: Session):
+        """Инициализирует CRUD операции для кандидатов.
+
+        Args:
+            session: Активная сессия SQLAlchemy.
+        """
         self.session = session
         self.candidate_repository = CandidateRepository(session)
         self.histories_repository = SearchHistoryRepository(session)
@@ -16,11 +25,33 @@ class CandidateCRUD:
         self.favorite_repository = FavoriteRepository(session)
 
     def get_candidate(self, candidate_id: int) -> Optional[Candidate]:
+        """Получает кандидата по его VK ID.
+
+        Args:
+            candidate_id: Уникальный идентификатор кандидата в ВК.
+
+        Returns:
+            Объект Candidate или None, если не найден.
+        """
         return self.candidate_repository.get_by_vk_id(candidate_id)
 
     def save_new_candidate(self, vk_id: int, first_name: str, last_name: str,
                            bdate: Optional[date] = None, city: Optional[str] = None,
                            sex: Optional[int] = None, has_photo: bool = True) -> Candidate:
+        """Сохраняет нового кандидата или обновляет существующего.
+
+        Args:
+            vk_id: Уникальный идентификатор кандидата в ВК.
+            first_name: Имя.
+            last_name: Фамилия.
+            bdate: Дата рождения.
+            city: Город.
+            sex: Пол.
+            has_photo: Наличие фото.
+
+        Returns:
+            Объект Candidate.
+        """
         user_data = {
             'first_name': first_name,
             'last_name': last_name,
@@ -34,6 +65,21 @@ class CandidateCRUD:
     def find_candidates(self, user_vk_id: int, city: Optional[str] = None,
                             sex: Optional[int] = None, age_from: int = 18,
                             age_to: int = 99, limit: int = 10) -> List[Candidate]:
+        """Находит подходящих кандидатов для пользователя.
+
+        Исключает уже показанных, в ЧС и в избранном.
+
+        Args:
+            user_vk_id: ID пользователя, для которого ищем.
+            city: Фильтр по городу.
+            sex: Фильтр по полу.
+            age_from: Минимальный возраст.
+            age_to: Максимальный возраст.
+            limit: Максимальное количество результатов.
+
+        Returns:
+            Список подходящих кандидатов.
+        """
         viewed_ids = self.histories_repository.get_viewed_candidates(user_vk_id)
         blacklisted_ids = self.blacklist_repository.get_blocked_candidates(user_vk_id)
         favorite_ids = self.favorite_repository.get_favorite_candidate_ids(user_vk_id)
@@ -52,9 +98,15 @@ class CandidateCRUD:
         return candidates
 
     def save_candidate_from_vk(self, vk_user_data: dict) -> Optional[Candidate]:
-        """
-        Сохранить кандидата из данных VK API.
-        Удобный метод-обертка.
+        """Сохраняет кандидата, используя сырые данные из VK API.
+
+        Парсит и конвертирует данные, затем сохраняет через репозиторий.
+
+        Args:
+            vk_user_data: Словарь с данными пользователя из VK.
+
+        Returns:
+            Объект Candidate или None при ошибке.
         """
         try:
             # Парсим данные из VK

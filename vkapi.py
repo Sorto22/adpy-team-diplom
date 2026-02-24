@@ -24,6 +24,7 @@ class VKUser:
     bdate: datetime.date
     city: str
     sex: int
+    city_id: int
 
 
 class VKSex(Enum):
@@ -41,8 +42,7 @@ class VKSex(Enum):
 
 
 class VkClient:
-    """
-    Клиент для взаимодействия с API ВКонтакте.
+    """Клиент для взаимодействия с API ВКонтакте.
 
     Предоставляет методы для поиска пользователей и получения фотографий.
     Автоматически добавляет токен доступа и версию API ко всем запросам.
@@ -203,6 +203,14 @@ class VkClient:
         return data
 
     def get_user_profile(self, user_id):
+        """Получает основную информацию о профиле пользователя ВКонтакте.
+
+        Args:
+            user_id (int): Уникальный идентификатор пользователя.
+
+        Returns:
+            Объект VKUser с данными профиля или None при ошибке.
+        """
         params = {
             "user_ids":user_id,
             "fields":"is_closed, has_photo, bdate, sex, city"
